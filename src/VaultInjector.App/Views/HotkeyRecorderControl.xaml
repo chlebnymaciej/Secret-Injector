@@ -1,0 +1,11 @@
+<UserControl x:Class="VaultInjector.App.Views.HotkeyRecorderControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <TextBox x:Name="DisplayBox"
+             IsReadOnly="True"
+             Focusable="True"
+             Padding="6,4"
+             VerticalContentAlignment="Center"
+             PreviewKeyDown="DisplayBox_PreviewKeyDown"
+             Text="Click here and press a key combination"/>
+</UserControl>
