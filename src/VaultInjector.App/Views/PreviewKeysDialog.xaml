@@ -1,0 +1,52 @@
+<Window x:Class="VaultInjector.App.Views.PreviewKeysDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Preview Keys"
+        Width="520" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+    <StackPanel Margin="16">
+        <Label Content="Starting Vault path (relative to base path; leave blank to start at the base path itself)"/>
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="100"/>
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="PathBox" Grid.Column="0"/>
+            <Button x:Name="LoadButton" Grid.Column="1" Content="Load Keys" Margin="8,0,0,0" Click="LoadButton_Click"/>
+        </Grid>
+        <TextBlock TextWrapping="Wrap" Margin="0,4,0,0" Foreground="DimGray"
+                   Text="Recursively walks every sub-path under the path above and lists each secret's field keys."/>
+
+        <TextBlock x:Name="StatusText" TextWrapping="Wrap" Margin="0,8,0,0" Foreground="DimGray"/>
+
+        <Grid Margin="0,10,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Label Grid.Column="0" Content="Keys found - check the ones to add to Quick Insert:"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button x:Name="SelectAllButton" Content="Select All" Width="80" Click="SelectAllButton_Click"/>
+                <Button x:Name="SelectNoneButton" Content="Select None" Width="90" Margin="6,0,0,0" Click="SelectNoneButton_Click"/>
+            </StackPanel>
+        </Grid>
+        <ListBox x:Name="KeysList" MaxHeight="300" ScrollViewer.VerticalScrollBarVisibility="Auto">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" Margin="2">
+                        <StackPanel>
+                            <TextBlock Text="{Binding RelativePath}" FontSize="11" Foreground="DimGray"/>
+                            <TextBlock Text="{Binding FieldName}" FontWeight="SemiBold"/>
+                        </StackPanel>
+                    </CheckBox>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button x:Name="AddSelectedButton" Content="Add Selected" Width="110" Click="AddSelectedButton_Click"/>
+            <Button x:Name="CloseButton" Content="Close" Width="90" Margin="8,0,0,0" Click="CloseButton_Click"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

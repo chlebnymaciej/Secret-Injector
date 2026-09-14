@@ -13,6 +13,7 @@ namespace VaultInjector.App.Views;
 public partial class SettingsWindow : Window
 {
     private readonly AppRuntime _runtime;
+    private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<SettingsWindow> _logger;
     private readonly ObservableCollection<SecretEntry> _secrets;
 
@@ -20,7 +21,8 @@ public partial class SettingsWindow : Window
     {
         InitializeComponent();
         _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
-        _logger = loggerFactory.CreateLogger<SettingsWindow>();
+        _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
+        _logger = _loggerFactory.CreateLogger<SettingsWindow>();
 
         var config = _runtime.Config;
 
@@ -131,7 +133,7 @@ public partial class SettingsWindow : Window
 
     private void AddSecretButton_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new SecretEntryEditDialog(_runtime, null) { Owner = this };
+        var dialog = new SecretEntryEditDialog(_runtime, _loggerFactory, null) { Owner = this };
         if (dialog.ShowDialog() == true)
         {
             _secrets.Add(dialog.Result);
@@ -146,7 +148,7 @@ public partial class SettingsWindow : Window
         }
 
         var index = _secrets.IndexOf(selected);
-        var dialog = new SecretEntryEditDialog(_runtime, selected) { Owner = this };
+        var dialog = new SecretEntryEditDialog(_runtime, _loggerFactory, selected) { Owner = this };
         if (dialog.ShowDialog() == true)
         {
             _secrets[index] = dialog.Result;
@@ -158,6 +160,56 @@ public partial class SettingsWindow : Window
         if (SecretsGrid.SelectedItem is SecretEntry selected)
         {
             _secrets.Remove(selected);
+        }
+    }
+
+    private void PreviewKeysButton_Click(object sender, RoutedEventArgs e)
+    {
+        var initialPath = (SecretsGrid.SelectedItem as SecretEntry)?.RelativePath;
+        var dialog = new PreviewKeysDialog(_runtime, _loggerFactory, initialPath) { Owner = this };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        SecretEntry? lastAdded = null;
+        var skipped = 0;
+        foreach (var key in dialog.SelectedKeys)
+        {
+            var alreadyPresent = _secrets.Any(s =>
+                s.Mode == SecretFetchMode.SingleField &&
+                string.Equals(s.RelativePath, key.RelativePath, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(s.FieldName, key.FieldName, StringComparison.OrdinalIgnoreCase));
+
+            if (alreadyPresent)
+            {
+                skipped++;
+                continue;
+            }
+
+            var leaf = key.RelativePath.Split('/', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? key.RelativePath;
+            lastAdded = new SecretEntry
+            {
+                Alias = $"{leaf}/{key.FieldName}",
+                RelativePath = key.RelativePath,
+                Mode = SecretFetchMode.SingleField,
+                FieldName = key.FieldName
+            };
+            _secrets.Add(lastAdded);
+        }
+
+        if (lastAdded is not null)
+        {
+            SecretsGrid.SelectedItem = lastAdded;
+        }
+
+        if (skipped > 0)
+        {
+            StatusText.Text = $"Added {dialog.SelectedKeys.Count - skipped} key(s) to Quick Insert ({skipped} already present, skipped).";
+        }
+        else if (dialog.SelectedKeys.Count > 0)
+        {
+            StatusText.Text = $"Added {dialog.SelectedKeys.Count} key(s) to Quick Insert.";
         }
     }
 

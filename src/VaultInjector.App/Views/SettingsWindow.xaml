@@ -68,6 +68,7 @@
                         <Button x:Name="AddSecretButton" Content="Add..." Width="90" Click="AddSecretButton_Click"/>
                         <Button x:Name="EditSecretButton" Content="Edit..." Width="90" Margin="8,0,0,0" Click="EditSecretButton_Click"/>
                         <Button x:Name="RemoveSecretButton" Content="Remove" Width="90" Margin="8,0,0,0" Click="RemoveSecretButton_Click"/>
+                        <Button x:Name="PreviewKeysButton" Content="Preview Keys..." Width="110" Margin="8,0,0,0" Click="PreviewKeysButton_Click"/>
                         <Button x:Name="MoveUpButton" Content="Move Up" Width="90" Margin="24,0,0,0" Click="MoveUpButton_Click"/>
                         <Button x:Name="MoveDownButton" Content="Move Down" Width="90" Margin="8,0,0,0" Click="MoveDownButton_Click"/>
                     </StackPanel>

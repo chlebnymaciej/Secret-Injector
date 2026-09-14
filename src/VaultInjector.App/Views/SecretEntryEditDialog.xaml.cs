@@ -1,4 +1,5 @@
 using System.Windows;
+using Microsoft.Extensions.Logging;
 using VaultInjector.App.Services;
 using VaultInjector.Core.Models;
 using MessageBox = System.Windows.MessageBox;
@@ -8,13 +9,15 @@ namespace VaultInjector.App.Views;
 public partial class SecretEntryEditDialog : Window
 {
     private readonly AppRuntime _runtime;
+    private readonly ILogger<SecretEntryEditDialog> _logger;
 
     public SecretEntry Result { get; private set; } = new();
 
-    public SecretEntryEditDialog(AppRuntime runtime, SecretEntry? existing)
+    public SecretEntryEditDialog(AppRuntime runtime, ILoggerFactory loggerFactory, SecretEntry? existing)
     {
         InitializeComponent();
         _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
+        _logger = (loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory))).CreateLogger<SecretEntryEditDialog>();
 
         if (existing is not null)
         {
@@ -33,6 +36,13 @@ public partial class SecretEntryEditDialog : Window
 
     private void UpdateFieldEnablement()
     {
+        // SingleFieldRadio's IsChecked="True" in XAML fires Checked during InitializeComponent,
+        // before FieldNameCombo (declared later in the tree) has been assigned to its field.
+        if (FieldNameCombo is null)
+        {
+            return;
+        }
+
         FieldNameCombo.IsEnabled = SingleFieldRadio.IsChecked == true;
     }
 
@@ -65,6 +75,7 @@ public partial class SecretEntryEditDialog : Window
         }
         catch (Exception ex)
         {
+            _logger.LogWarning(ex, "Test/Load Fields failed for path '{RelativePath}'", RelativePathBox.Text.Trim());
             TestResultText.Text = $"Failed: {ex.Message}";
         }
         finally

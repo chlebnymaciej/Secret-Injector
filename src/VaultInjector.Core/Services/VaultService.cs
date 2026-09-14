@@ -121,6 +121,63 @@ public sealed class VaultService : IVaultService
         }
     }
 
+    public async Task<IReadOnlyList<string>> ListSecretPathsAsync(VaultConnectionSettings settings, string token, string relativePath, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            throw new VaultServiceException("No Vault token available. Log in first.");
+        }
+
+        var logicalPath = VaultPathBuilder.BuildLogicalPath(settings, relativePath, allowEmptyRelativePath: true);
+        var operation = $"secrets/{settings.MountPath}/{logicalPath} (KV v{(int)settings.KvVersion} list)";
+        var client = CreateClient(settings, token);
+        var sw = Stopwatch.StartNew();
+
+        try
+        {
+            List<string> keys;
+            if (settings.KvVersion == KvVersion.V2)
+            {
+                var result = await client.V1.Secrets.KeyValue.V2
+                    .ReadSecretPathsAsync(path: logicalPath, mountPoint: settings.MountPath)
+                    .ConfigureAwait(false);
+                keys = result.Data.Keys.ToList();
+            }
+            else
+            {
+                var result = await client.V1.Secrets.KeyValue.V1
+                    .ReadSecretPathsAsync(path: logicalPath, mountPoint: settings.MountPath)
+                    .ConfigureAwait(false);
+                keys = result.Data.Keys.ToList();
+            }
+
+            sw.Stop();
+            LogCall(operation, "LIST", 200, sw.ElapsedMilliseconds, fieldCount: keys.Count);
+            return keys;
+        }
+        catch (VaultApiException vex) when (vex.StatusCode == 404)
+        {
+            // No listable children at this path - typically means it's a leaf secret, not a folder.
+            sw.Stop();
+            LogCall(operation, "LIST", 404, sw.ElapsedMilliseconds);
+            return Array.Empty<string>();
+        }
+        catch (VaultApiException vex)
+        {
+            sw.Stop();
+            LogCall(operation, "LIST", vex.StatusCode, sw.ElapsedMilliseconds, vex);
+            throw new VaultServiceException(DescribeVaultApiException(vex), vex.StatusCode, vex);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException and not VaultServiceException)
+        {
+            sw.Stop();
+            LogCall(operation, "LIST", null, sw.ElapsedMilliseconds, ex);
+            throw new VaultServiceException($"Failed to list secrets at '{relativePath}': {ex.Message}", null, ex);
+        }
+    }
+
     public async Task<string> ResolveSecretValueAsync(VaultConnectionSettings settings, string token, SecretEntry entry, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entry);

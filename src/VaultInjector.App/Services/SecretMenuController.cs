@@ -1,4 +1,5 @@
 using System.Windows.Forms;
+using System.Windows.Threading;
 using Microsoft.Extensions.Logging;
 using VaultInjector.App.Native;
 using VaultInjector.Core.Models;
@@ -53,7 +54,12 @@ public sealed class SecretMenuController
             ShowImageMargin = false,
             ShowCheckMargin = false
         };
-        menu.Closed += (_, _) => menu.Dispose();
+        // Disposing synchronously here races with WinForms' own ModalMenuFilter, which keeps touching
+        // this control's handle right after Closed fires (to process the activation change) and throws
+        // ObjectDisposedException if we've already torn it down - crashing the whole process, since that
+        // filter runs on a raw message hook outside the WPF dispatcher's exception handling. Deferring the
+        // dispose to the next dispatcher pass lets that in-flight processing finish first.
+        menu.Closed += (_, _) => Dispatcher.CurrentDispatcher.BeginInvoke(DispatcherPriority.Background, new Action(menu.Dispose));
 
         foreach (var entry in config.Secrets)
         {

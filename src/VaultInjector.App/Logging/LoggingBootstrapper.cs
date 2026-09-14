@@ -20,6 +20,21 @@ public static class LoggingBootstrapper
         Directory.CreateDirectory(logsDirectory);
         LevelSwitch.MinimumLevel = ParseLevel(levelName);
 
+        // If the logging pipeline itself ever fails (e.g. can't write to the log file), report that
+        // failure somewhere too instead of silently dropping every subsequent log entry.
+        var selfLogPath = Path.Combine(logsDirectory, "log-selflog.txt");
+        Serilog.Debugging.SelfLog.Enable(msg =>
+        {
+            try
+            {
+                File.AppendAllText(selfLogPath, $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz} {msg}{Environment.NewLine}");
+            }
+            catch
+            {
+                // Nothing more we can do if even the self-log write fails.
+            }
+        });
+
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.ControlledBy(LevelSwitch)
             .Enrich.FromLogContext()

@@ -78,6 +78,8 @@ public partial class App : Application
         }
 
         DispatcherUnhandledException += OnDispatcherUnhandledException;
+        AppDomain.CurrentDomain.UnhandledException += OnAppDomainUnhandledException;
+        TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
 
         if (!tokenStore.HasToken)
         {
@@ -117,6 +119,33 @@ public partial class App : Application
         _loggerFactory.CreateLogger<App>().LogError(e.Exception, "Unhandled UI exception");
         _trayIconManager.ShowBalloon($"Unexpected error: {e.Exception.Message}", ToolTipIcon.Error);
         e.Handled = true;
+    }
+
+    /// <summary>
+    /// Last-resort net for exceptions raised off the WPF dispatcher thread (background/thread-pool work).
+    /// The CLR terminates the process right after this fires when <see cref="UnhandledExceptionEventArgs.IsTerminating"/>
+    /// is true - there's no way to prevent that, so this only logs it before the process goes down.
+    /// </summary>
+    private void OnAppDomainUnhandledException(object sender, UnhandledExceptionEventArgs e)
+    {
+        var logger = _loggerFactory.CreateLogger<App>();
+        if (e.ExceptionObject is Exception ex)
+        {
+            logger.LogCritical(ex, "Unhandled non-UI exception (IsTerminating={IsTerminating})", e.IsTerminating);
+        }
+        else
+        {
+            logger.LogCritical("Unhandled non-UI exception of unknown type: {ExceptionObject} (IsTerminating={IsTerminating})", e.ExceptionObject, e.IsTerminating);
+        }
+
+        Log.CloseAndFlush();
+    }
+
+    /// <summary>Catches exceptions from fire-and-forget Tasks whose faults nobody awaited/observed.</summary>
+    private void OnUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
+    {
+        _loggerFactory.CreateLogger<App>().LogError(e.Exception, "Unobserved task exception");
+        e.SetObserved();
     }
 
     protected override void OnExit(ExitEventArgs e)
