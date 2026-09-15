@@ -29,6 +29,8 @@ public partial class PreviewKeysDialog : Window
         InitializeComponent();
         _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
         _logger = (loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory))).CreateLogger<PreviewKeysDialog>();
+
+        Icon = TrayIconRenderer.RenderKeyIconImageSource(32);
         PathBox.Text = initialPath ?? string.Empty;
         KeysList.ItemsSource = _keys;
     }

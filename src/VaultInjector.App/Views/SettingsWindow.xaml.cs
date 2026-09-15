@@ -24,6 +24,8 @@ public partial class SettingsWindow : Window
         _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
         _logger = _loggerFactory.CreateLogger<SettingsWindow>();
 
+        Icon = TrayIconRenderer.RenderKeyIconImageSource(32);
+
         var config = _runtime.Config;
 
         VaultAddressBox.Text = config.Vault.Address;
@@ -75,6 +77,7 @@ public partial class SettingsWindow : Window
     {
         if (!_runtime.TokenStore.HasToken)
         {
+            SetLoginStatusIcon(isLoggedIn: false);
             LoginStatusText.Text = "Not logged in.";
             return;
         }
@@ -82,15 +85,23 @@ public partial class SettingsWindow : Window
         var token = _runtime.TokenStore.LoadToken();
         if (string.IsNullOrWhiteSpace(token))
         {
+            SetLoginStatusIcon(isLoggedIn: false);
             LoginStatusText.Text = "Not logged in.";
             return;
         }
 
         LoginStatusText.Text = "Checking stored token...";
         var info = await _runtime.VaultService.ValidateTokenAsync(BuildVaultSettingsFromForm(), token);
+        SetLoginStatusIcon(info.IsValid);
         LoginStatusText.Text = info.IsValid
             ? $"Logged in as '{info.DisplayName}'. Policies: {string.Join(", ", info.Policies)}. Expires: {(info.ExpiresAt?.ToLocalTime().ToString("g") ?? "never")}."
             : $"Stored token is no longer valid: {info.Error}";
+    }
+
+    private void SetLoginStatusIcon(bool isLoggedIn)
+    {
+        LoggedInIcon.Visibility = isLoggedIn ? Visibility.Visible : Visibility.Collapsed;
+        LoggedOutIcon.Visibility = isLoggedIn ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private async void LoginButton_Click(object sender, RoutedEventArgs e)
@@ -110,12 +121,15 @@ public partial class SettingsWindow : Window
             if (info.IsValid)
             {
                 _runtime.TokenStore.SaveToken(token);
+                _runtime.NotifyTokenChanged();
                 TokenBox.Clear();
+                SetLoginStatusIcon(true);
                 LoginStatusText.Text = $"Logged in as '{info.DisplayName}'. Policies: {string.Join(", ", info.Policies)}.";
                 _logger.LogInformation("User logged in to Vault via Settings window");
             }
             else
             {
+                SetLoginStatusIcon(false);
                 LoginStatusText.Text = $"Login failed: {info.Error}";
             }
         }
@@ -128,6 +142,8 @@ public partial class SettingsWindow : Window
     private void LogoutButton_Click(object sender, RoutedEventArgs e)
     {
         _runtime.TokenStore.ClearToken();
+        _runtime.NotifyTokenChanged();
+        SetLoginStatusIcon(false);
         LoginStatusText.Text = "Not logged in.";
     }
 

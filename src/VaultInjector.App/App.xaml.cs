@@ -20,6 +20,7 @@ public partial class App : Application
     private TrayIconManager _trayIconManager = null!;
     private GlobalHotkeyService _hotkeyService = null!;
     private SecretMenuController _menuController = null!;
+    private TokenStatusMonitor _tokenStatusMonitor = null!;
     private SettingsWindow? _settingsWindow;
 
     private static readonly string AppDataDirectory =
@@ -77,6 +78,13 @@ public partial class App : Application
                 ToolTipIcon.Warning);
         }
 
+        _tokenStatusMonitor = new TokenStatusMonitor(
+            _runtime,
+            (text, icon) => _trayIconManager.ShowBalloon(text, icon),
+            _loggerFactory.CreateLogger<TokenStatusMonitor>());
+        _tokenStatusMonitor.LoginStatusChanged += (_, isLoggedIn) => _trayIconManager.SetLoginStatus(isLoggedIn);
+        _runtime.TokenChanged += (_, _) => _ = _tokenStatusMonitor.CheckAsync();
+
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += OnAppDomainUnhandledException;
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
@@ -85,6 +93,8 @@ public partial class App : Application
         {
             _trayIconManager.ShowBalloon("Vault Injector is running. Open Settings to log in to Vault.", ToolTipIcon.Info);
         }
+
+        _tokenStatusMonitor.Start();
     }
 
     private void ShowSettingsWindow()
@@ -150,6 +160,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _tokenStatusMonitor?.Dispose();
         _hotkeyService?.Dispose();
         _trayIconManager?.Dispose();
         Log.CloseAndFlush();

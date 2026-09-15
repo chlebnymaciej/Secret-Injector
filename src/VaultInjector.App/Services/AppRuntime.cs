@@ -22,6 +22,9 @@ public sealed class AppRuntime
 
     public event EventHandler? ConfigChanged;
 
+    /// <summary>Raised after the stored Vault token is saved or cleared, so listeners can re-check login status immediately.</summary>
+    public event EventHandler? TokenChanged;
+
     public AppRuntime(
         IConfigStore configStore,
         ITokenStore tokenStore,
@@ -48,6 +51,8 @@ public sealed class AppRuntime
         _logger.LogInformation("Configuration saved ({SecretCount} secret entries)", config.Secrets.Count);
         ConfigChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    public void NotifyTokenChanged() => TokenChanged?.Invoke(this, EventArgs.Empty);
 
     public void ReloadConfig()
     {

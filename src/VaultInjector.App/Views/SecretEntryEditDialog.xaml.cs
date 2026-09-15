@@ -19,6 +19,8 @@ public partial class SecretEntryEditDialog : Window
         _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
         _logger = (loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory))).CreateLogger<SecretEntryEditDialog>();
 
+        Icon = TrayIconRenderer.RenderKeyIconImageSource(32);
+
         if (existing is not null)
         {
             Result = existing.Clone();
