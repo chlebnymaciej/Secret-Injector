@@ -19,23 +19,49 @@ public sealed class ClipboardPasteService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public void PasteIntoWindow(string secretValue, IntPtr targetWindow, bool restoreClipboardAfter, int restoreDelayMs)
+    /// <summary>
+    /// Minimum time (ms) the secret is left on the clipboard when the automatic keystroke had to be
+    /// skipped, so there's a realistic window to paste it manually before it's cleared/restored.
+    /// </summary>
+    private const int MinManualPasteWindowMs = 15000;
+
+    /// <returns>
+    /// True if the automatic Ctrl+V was actually sent; false if it was skipped because the target window
+    /// belongs to a higher-integrity process (e.g. an elevated prompt or a "Windows Security" credential
+    /// dialog) - Windows' UIPI would silently drop synthetic input there, so the secret is left on the
+    /// clipboard for the user to paste manually instead of pretending it worked.
+    /// </returns>
+    public bool PasteIntoWindow(string secretValue, IntPtr targetWindow, bool restoreClipboardAfter, int restoreDelayMs)
     {
         IDataObject? previousClipboard = restoreClipboardAfter ? TryCaptureClipboard() : null;
 
         WithClipboardRetry(() => Clipboard.SetText(secretValue));
 
-        ForegroundWindowHelper.ForceSetForegroundWindow(targetWindow);
+        var requiresManualPaste = ProcessIntegrity.IsHigherIntegrityThanSelf(targetWindow);
+        if (requiresManualPaste)
+        {
+            _logger.LogInformation(
+                "Target window belongs to a higher-integrity process (e.g. an elevated or credential-prompt window) - " +
+                "a simulated Ctrl+V would be silently blocked by Windows, so leaving the secret on the clipboard for a manual paste instead");
+        }
+        else
+        {
+            ForegroundWindowHelper.ForceSetForegroundWindow(targetWindow);
 
-        // Give the OS a moment to finish switching focus before the keystrokes land.
-        System.Threading.Thread.Sleep(60);
-        KeyboardSimulator.SendCtrlV();
+            // Give the OS a moment to finish switching focus before the keystrokes land.
+            System.Threading.Thread.Sleep(60);
+            KeyboardSimulator.SendCtrlV();
+        }
 
-        _logger.LogInformation("Pasted secret into foreground window (restoreClipboard={RestoreClipboard})", restoreClipboardAfter);
+        _logger.LogInformation(
+            "Secret {Mode} (restoreClipboard={RestoreClipboard})",
+            requiresManualPaste ? "copied to clipboard for manual paste" : "pasted into foreground window",
+            restoreClipboardAfter);
 
         if (restoreClipboardAfter)
         {
-            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(Math.Max(restoreDelayMs, 200)) };
+            var effectiveDelayMs = requiresManualPaste ? Math.Max(restoreDelayMs, MinManualPasteWindowMs) : restoreDelayMs;
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(Math.Max(effectiveDelayMs, 200)) };
             timer.Tick += (_, _) =>
             {
                 timer.Stop();
@@ -43,6 +69,8 @@ public sealed class ClipboardPasteService
             };
             timer.Start();
         }
+
+        return !requiresManualPaste;
     }
 
     private void RestoreClipboard(IDataObject? previousClipboard)

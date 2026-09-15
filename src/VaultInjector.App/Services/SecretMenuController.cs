@@ -89,11 +89,18 @@ public sealed class SecretMenuController
                 .ResolveSecretValueAsync(_runtime.Config.Vault, token, entry)
                 .ConfigureAwait(true);
 
-            _pasteService.PasteIntoWindow(
+            var pastedAutomatically = _pasteService.PasteIntoWindow(
                 value,
                 targetWindow,
                 _runtime.Config.RestoreClipboardAfterPaste,
                 _runtime.Config.ClipboardRestoreDelayMs);
+
+            if (!pastedAutomatically)
+            {
+                _notify(
+                    $"'{entry.Alias}' copied to clipboard. This window needs elevated privileges, so Windows blocks automatic paste - click into the field and press Ctrl+V yourself.",
+                    ToolTipIcon.Warning);
+            }
         }
         catch (Exception ex)
         {
