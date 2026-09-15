@@ -10,3 +10,6 @@ obj/
 
 ## Test results
 TestResults/
+
+## Inno Setup installer build output
+installer/Output/

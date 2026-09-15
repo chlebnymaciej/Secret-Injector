@@ -29,7 +29,12 @@ public sealed class AutoStartService
 
         if (enabled)
         {
+            // Environment.ProcessPath is reliably set on Windows and is checked first; the Assembly.Location
+            // fallback below only exists for the (practically unreachable) case where it isn't - silencing
+            // IL3000 here since a single-file publish flags Location's use even though this path never runs.
+#pragma warning disable IL3000
             var exePath = Environment.ProcessPath ?? System.Reflection.Assembly.GetExecutingAssembly().Location;
+#pragma warning restore IL3000
             key.SetValue(ValueName, $"\"{exePath}\"");
             _logger.LogInformation("Enabled start-with-Windows ({ExePath})", exePath);
         }

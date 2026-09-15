@@ -66,7 +66,51 @@ Publisher" on first run; click through it, or get a cert and flip `SignManifests
 `ManifestCertificateThumbprint` in the profile to remove that warning. Bump `ApplicationVersion` in the
 profile before each new release so ClickOnce treats it as an upgrade rather than a downgrade.
 
-> Note: `VaultInjector.App.csproj` sets `EnableWindowsTargeting=true` so the solution can also be
+### Hosting it on the internal static server
+
+`ClickOnceHostedProfile.pubxml` (same folder) is the same setup but published straight onto
+`\\cm-dev.adrentech.com\static\VaultInjector\`, which backs `https://cm-dev.adrentech.com/static/VaultInjector/`
+- so instead of handing someone a folder, they just browse to
+`https://cm-dev.adrentech.com/static/VaultInjector/VaultInjector.application` and install from there. It
+also turns on ClickOnce auto-update (checked in the background after each launch, so the tray app never
+blocks startup on a network check) - already-installed clients pick up a new version next time they run
+it, no reinstall needed.
+
+```powershell
+dotnet restore src\VaultInjector.App\VaultInjector.App.csproj -r win-x64
+msbuild src\VaultInjector.App\VaultInjector.App.csproj `
+  /t:Publish /p:PublishProfile=ClickOnceHostedProfile /p:Configuration=Release `
+  /p:RuntimeIdentifier=win-x64 /p:SelfContained=true
+```
+
+Needs write access to the `\\cm-dev.adrentech.com\static` share. As of this writing that account can
+create and overwrite files there but **not delete them** - harmless for normal republishing (ClickOnce
+mostly adds new versioned folders and overwrites the top-level `.application` manifest, it doesn't need
+to delete anything), but don't count on ever being able to clean up a botched publish there yourself.
+Same version-bumping rule as above: bump `ApplicationVersion` (reset `ApplicationRevision` to 0) before
+every publish, or existing installs won't see it as an update.
+
+### Building a single setup.exe
+
+Both profiles above are ClickOnce, which installs into a versioned `Application Files\...` tree with no
+single installer file. For one plain `VaultInjectorSetup.exe` instead, `FolderProfile.pubxml` publishes a
+self-contained, single-file build (no separate .NET install needed on the target machine, and unlike
+ClickOnce this doesn't need full-framework MSBuild - plain `dotnet publish` is enough), and
+`installer/VaultInjector.iss` (an [Inno Setup](https://jrsoftware.org/isinfo.php) script, not bundled
+with this repo - install it separately, e.g. `winget install JRSoftware.InnoSetup`) wraps that into the
+installer:
+
+```powershell
+dotnet publish src\VaultInjector.App\VaultInjector.App.csproj -p:PublishProfile=FolderProfile -c Release
+iscc installer\VaultInjector.iss
+```
+
+The installer lands at `installer\Output\VaultInjectorSetup.exe`. It installs per-user (no admin prompt,
+matching the app itself never elevating), adds a Start Menu shortcut and an optional desktop shortcut,
+registers a normal uninstall entry under Settings > Apps, and offers to launch the app once install
+finishes. Bump `AppVersion` in the script before each release; `AppId` must never change across releases
+- Inno Setup uses it, not the name, to recognize a reinstall as an upgrade of the same product rather
+than a second copy.
 > *compiled* on non-Windows machines (e.g. WSL) for CI/dev-loop convenience. It has no effect on
 > Windows and the app must still be *run* on Windows, since it depends on Win32 APIs, WPF and
 > Windows Forms.
