@@ -38,6 +38,34 @@ dotnet run --project src/VaultInjector.App
 `dotnet test` runs the unit tests (`src/VaultInjector.Tests`), which cover the platform-agnostic
 logic in `VaultInjector.Core` (config persistence, Vault path building) without needing Windows.
 
+## Building an installer
+
+`src/VaultInjector.App/Properties/PublishProfiles/ClickOnceProfile.pubxml` publishes a self-contained
+ClickOnce installer (no separate .NET install needed on the target machine). ClickOnce's manifest
+generation needs the *full-framework* MSBuild from a Visual Studio install - the cross-platform `dotnet`
+CLI's MSBuild can restore for it but can't run the publish step itself (`MSB4803 UpdateManifest is not
+supported on the .NET Core version of MSBuild`). From a **Developer PowerShell for VS 2022** prompt:
+
+```powershell
+dotnet restore src\VaultInjector.App\VaultInjector.App.csproj -r win-x64
+msbuild src\VaultInjector.App\VaultInjector.App.csproj `
+  /t:Publish /p:PublishProfile=ClickOnceProfile /p:Configuration=Release `
+  /p:RuntimeIdentifier=win-x64 /p:SelfContained=true
+```
+
+(or open the project in Visual Studio and use **Build > Publish VaultInjector.App**, which picks up the
+same profile). The installer lands in
+`src/VaultInjector.App/bin/Release/net8.0-windows/win-x64/app.publish/` - hand someone the whole folder
+and have them double-click `VaultInjector.application` to install it (Start Menu shortcut + an uninstall
+entry under Settings > Apps, both added automatically). There's no separate `setup.exe`; ClickOnce for
+.NET (as opposed to .NET Framework) installs directly from the `.application` manifest.
+
+Because manifest signing is off (`SignManifests=false` in the profile - signing needs a code-signing
+certificate this repo doesn't have), Windows SmartScreen will flag the installer as from an "Unknown
+Publisher" on first run; click through it, or get a cert and flip `SignManifests`/set
+`ManifestCertificateThumbprint` in the profile to remove that warning. Bump `ApplicationVersion` in the
+profile before each new release so ClickOnce treats it as an upgrade rather than a downgrade.
+
 > Note: `VaultInjector.App.csproj` sets `EnableWindowsTargeting=true` so the solution can also be
 > *compiled* on non-Windows machines (e.g. WSL) for CI/dev-loop convenience. It has no effect on
 > Windows and the app must still be *run* on Windows, since it depends on Win32 APIs, WPF and

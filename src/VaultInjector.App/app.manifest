@@ -2,13 +2,14 @@
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
   <assemblyIdentity version="1.0.0.0" name="VaultInjector.App"/>
 
-  <!-- Common Controls v6 so the tray's WinForms context menu renders with modern (themed) visual styles. -->
-  <dependency>
-    <dependentAssembly>
-      <assemblyIdentity type="win32" name="Microsoft.Windows.Common-Controls" version="6.0.0.0"
-                        processorArchitecture="*" publicKeyToken="6595b64144ccf1df" language="*"/>
-    </dependentAssembly>
-  </dependency>
+  <!--
+    Common Controls v6 theming for the tray's WinForms context menu is handled at runtime by
+    Application.EnableVisualStyles() (see App.xaml.cs) instead of a static manifest dependency here.
+    A prior version of this file declared it via <dependency>/<dependentAssembly>, but ClickOnce's
+    manifest generation (see Properties/PublishProfiles/ClickOnceProfile.pubxml) tries to resolve every
+    such entry as a deployable file and fails with MSB3113 for native side-by-side assemblies like this
+    one, which aren't files on disk to copy. EnableVisualStyles() achieves the same theming without it.
+  -->
 
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
